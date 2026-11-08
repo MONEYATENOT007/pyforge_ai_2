@@ -65,9 +65,9 @@ The doctor tests whether a parent directory appears writable but performs no wri
 
 ## Optional local model
 
-The approved lightweight artifact is [`qwen2.5-coder:1.5b-instruct-q4_K_M`](https://ollama.com/library/qwen2.5-coder%3A1.5b-instruct): Ollama lists digest `d7372fd82851`, 986 MB model size, Q4_K_M quantization, and Apache 2.0 license. The [upstream Qwen 1.5B Instruct license](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct/blob/cc932d8a05bf5a3dcd700f50584714d17fc4d03a/LICENSE) is also Apache 2.0. A 7B candidate should be benchmarked only after the lightweight baseline is practical.
+The lightweight default is [`qwen2.5-coder:1.5b-instruct-q4_K_M`](https://ollama.com/library/qwen2.5-coder%3A1.5b-instruct): Ollama lists digest `d7372fd82851`, 986 MB model size, Q4_K_M quantization, and Apache 2.0 license. The [upstream Qwen 1.5B Instruct license](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct/blob/cc932d8a05bf5a3dcd700f50584714d17fc4d03a/LICENSE) is also Apache 2.0. With owner approval, [`qwen2.5-coder:7b-instruct-q4_K_M`](https://ollama.com/library/qwen2.5-coder:7b-instruct-q4_K_M) was installed alongside it on F:. The 7B model is selectable in chat but remains an optional comparison model: seven matched text/static probes still showed GUI and repair failures, and its median generation speed was about 5.6 times slower. See [task-level evidence](docs/MODEL_FAILURE_ROOT_CAUSE_ANALYSIS.md#8-approved-7b-q4-paired-comparison). No generated application was run in the host or an isolated backend.
 
-On the current PC, Ollama 0.40.14 is extracted under `local_runtime/ollama` and the model is under `local_runtime/models`, both on F:. `local_runtime/` is ignored by Git. Start the portable server with:
+On the current PC, Ollama 0.40.14 is extracted under `local_runtime/ollama` and both model artifacts are under `local_runtime/models`, all on F:. `local_runtime/` is ignored by Git. Start the portable server with:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_ollama.ps1
