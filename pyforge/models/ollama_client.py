@@ -19,7 +19,7 @@ def _cloud_tag(model: str) -> bool:
 
 class OllamaClient:
     def __init__(self, model: str, url: str = "http://127.0.0.1:11434", timeout: float = 120, context: int = 4096,
-                 max_output_tokens: int | None = None) -> None:
+                 max_output_tokens: int | None = None, num_gpu: int | None = None) -> None:
         parsed = urlsplit(url)
         if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or parsed.username or parsed.password or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
             raise ValueError("Ollama URL must be a loopback HTTP origin")
@@ -31,11 +31,14 @@ class OllamaClient:
             raise ValueError("timeout and context must be positive")
         if max_output_tokens is not None and max_output_tokens <= 0:
             raise ValueError("max_output_tokens must be positive")
+        if num_gpu is not None and num_gpu < 0:
+            raise ValueError("num_gpu must be non-negative")
         self.url = url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.context = context
         self.max_output_tokens = max_output_tokens
+        self.num_gpu = num_gpu
         self._opener = build_opener(ProxyHandler({}))
 
     def list_models(self) -> list[str]:
@@ -91,6 +94,8 @@ class OllamaClient:
         options = {"num_ctx": size, "temperature": 0}
         if self.max_output_tokens is not None:
             options["num_predict"] = self.max_output_tokens
+        if self.num_gpu is not None:
+            options["num_gpu"] = self.num_gpu
         body = json.dumps({"model": self.model, "messages": messages, "stream": True, "options": options}).encode("utf-8")
         request = Request(self.url + "/api/chat", data=body, headers={"Content-Type": "application/json"}, method="POST")
         try:
@@ -137,6 +142,8 @@ class OllamaClient:
         options = {"num_ctx": self.context, "temperature": 0}
         if self.max_output_tokens is not None:
             options["num_predict"] = self.max_output_tokens
+        if self.num_gpu is not None:
+            options["num_gpu"] = self.num_gpu
         body = json.dumps({"model": self.model, "prompt": prompt, "stream": False, "options": options}).encode("utf-8")
         request = Request(self.url + "/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
         started = time.monotonic()

@@ -65,6 +65,31 @@ tk.Button(root, command=choose)
             self.assertTrue(any(item.label == "Installed model" for item in app.selectbox))
             self.assertTrue(any(item.label == "Redact potential secrets" and item.value for item in app.checkbox))
 
+    def test_7b_on_rtx_2060_defaults_to_cpu_mode(self):
+        models = ["qwen2.5-coder:1.5b-instruct-q4_K_M", "qwen2.5-coder:7b-instruct-q4_K_M"]
+        selected_modes = []
+
+        def fake_stream(client, messages, *, context):
+            selected_modes.append(client.num_gpu)
+            yield ModelChunk(text="ready")
+            yield ModelChunk(done=True, output_tokens=1)
+
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"PYFORGE_DATA_ROOT": temp}), patch(
+            "pyforge.models.ollama_client.OllamaClient.list_models", return_value=models
+        ), patch("pyforge.models.ollama_client.OllamaClient.model_metadata", return_value={}), patch(
+            "pyforge.ui.app._gpu", return_value={"status": "ok", "gpus": ["NVIDIA GeForce RTX 2060, 6144, 4500, 591.86"]}
+        ), patch("pyforge.chat.service.OllamaClient.chat_stream", fake_stream):
+            app = AppTest.from_file(str(APP)).run(timeout=20)
+            self.assertFalse(next(item for item in app.checkbox if item.label.startswith("CPU only")).value)
+            next(item for item in app.selectbox if item.label == "Installed model").set_value(models[1])
+            app.run(timeout=20)
+            self.assertEqual(len(app.exception), 0, [item.message for item in app.exception])
+            self.assertTrue(next(item for item in app.checkbox if item.label.startswith("CPU only")).value)
+            next(item for item in app.text_area if item.label == "Message").set_value("Reply ready")
+            app.button(key="FormSubmitter:compose-Send").click()
+            app.run(timeout=20)
+            self.assertEqual(selected_modes, [0])
+
     def test_user_can_send_streamed_message_and_reopen_history(self):
         def fake_stream(_client, messages, *, context):
             self.assertEqual(messages[-1]["content"], "Explain a list")

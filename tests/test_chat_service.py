@@ -57,7 +57,7 @@ class ChatServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             store = ChatStore(Path(temp) / "chat.sqlite3")
             session = store.create_session()
-            client = OllamaClient("local:model")
+            client = OllamaClient("local:model", num_gpu=0)
             metadata = {"model_digest": "digest123", "quantization": "Q4_K_M",
                         "runtime_version": "0.40.14"}
             with patch.object(client, "model_metadata", return_value=metadata), patch.object(
@@ -73,6 +73,7 @@ class ChatServiceTests(unittest.TestCase):
             self.assertEqual(saved["run"]["model_digest"], "digest123")
             self.assertEqual(saved["run"]["quantization"], "Q4_K_M")
             self.assertEqual(saved["run"]["runtime_version"], "0.40.14")
+            self.assertEqual(saved["run"]["num_gpu"], 0)
             self.assertEqual(saved["run"]["system_prompt"], sent[0]["content"])
             self.assertTrue(saved["run"]["requirements_checklist"])
 

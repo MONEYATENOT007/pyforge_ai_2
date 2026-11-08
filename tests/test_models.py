@@ -126,6 +126,19 @@ class ModelTests(unittest.TestCase):
             self.assertEqual(client.generate("say ready").text, "ready")
             self.assertEqual(json.loads(server.last_body)["options"]["num_predict"], 128)
 
+    def test_cpu_only_option_is_sent_for_chat_and_generate(self):
+        events = b'{"message":{"content":"ready"},"done":true}\n'
+        with local_ollama_response(body=events) as server:
+            client = OllamaClient("a:7b", f"http://127.0.0.1:{server.server_port}", num_gpu=0)
+            self.assertTrue(list(client.chat_stream([{"role": "user", "content": "ready"}]))[-1].done)
+            self.assertEqual(json.loads(server.last_body)["options"]["num_gpu"], 0)
+        with local_ollama_response(body=b'{"response":"ready"}') as server:
+            client = OllamaClient("a:7b", f"http://127.0.0.1:{server.server_port}", num_gpu=0)
+            self.assertEqual(client.generate("ready").text, "ready")
+            self.assertEqual(json.loads(server.last_body)["options"]["num_gpu"], 0)
+        with self.assertRaisesRegex(ValueError, "num_gpu"):
+            OllamaClient("a:7b", num_gpu=-1)
+
     def test_model_metadata_reads_server_fields_without_guessing_from_tag(self):
         client = OllamaClient("example:q4")
         responses = {

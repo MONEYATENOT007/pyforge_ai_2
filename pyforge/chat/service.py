@@ -30,6 +30,7 @@ def stream_exchange(store: ChatStore, client, session_id: int, prompt: str, prof
         "runtime_version": "unknown",
         "context_tokens": context,
         "temperature": 0 if is_ollama else "unknown",
+        "num_gpu": client.num_gpu if is_ollama and client.num_gpu is not None else "auto",
         "max_output_tokens": client.max_output_tokens if is_ollama and client.max_output_tokens is not None else "unknown",
         "top_p": "unknown",
         "seed": "unknown",

@@ -1,9 +1,17 @@
 # PyForge AI progress
 
-**Local package version:** 0.3.1 (source: `pyforge/_version.py`)
+**Local package version:** 0.3.2 (source: `pyforge/_version.py`)
 
 **Last updated:** 2026-11-08
 **Status:** Working offline-first chat and analysis prototype. Isolated execution is not available.
+
+### Ollama HTTP 500 recovery (2026-11-08)
+
+- The optional 7B model repeatedly returned HTTP 500 before generating text. Ollama 0.40.14 logs show `CUDA error: shared object initialization failed` during Windows CUDA warmup, followed by runner exit `0xc0000409`. A tiny 7B prompt reproduced it; a tiny 1.5B prompt completed. This is a local Ollama runner failure, not evidence that PyForge truncated the response or that the 7B weights are corrupt.
+- An upstream-reported `CUDA_MODULE_LOADING=EAGER` workaround was tried only in the portable Ollama child process. On this PC it stalled Ollama GPU discovery and even `/api/version` timed out, so that launcher change was reverted. Existing chat data and model files are untouched. Verification of a safer, request-scoped workaround is pending below; package version remains 0.3.1 until any user-visible change is settled.
+- A direct 7B CPU-only request (`num_gpu=0`, context 2048, 8 output tokens) completed in 72.12 seconds, after the normal Ollama launcher was restored. The client now accepts an explicit per-request GPU layer count and records it in run metadata. On this RTX 2060, chat now defaults the optional 7B model to CPU-only mode, while 1.5B keeps GPU acceleration. Users can override the checkbox. The chat UI also describes saved partial text accurately. Context-4096 and regression verification are in progress. This is the user-visible v0.3.2 milestone; the default model remains 1.5B.
+- Verification: 7B CPU-only context 4096 completed in 69.63 s, and a 1.5B GPU request completed after model switching in 97.88 s. The final UI request-path assertion passed; full suite passed 58 tests; Ruff F821, `pip check`, and scoped `git diff --check` passed. Streamlit AppTest rendered the real F: data with v0.3.2 and both models, zero exceptions; port 8501 root and health and Ollama API returned HTTP 200. After the F: venv editable reinstall, CLI, source, and installed metadata all report 0.3.2. An ignored stale 0.3.1 `pyforge_ai.egg-info` was archived under `local_runtime/archive` to avoid masking current metadata. See [incident log](docs/experiment_log.md#2026-11-08--ollama-http-500-recovery-v032).
+- Remaining: observe 7B CPU mode under longer real prompts and reassess Ollama CUDA behavior after upstream fixes. Isolated generated-code execution remains disabled.
 
 This is the current work ledger. Update it in the same change as any source, test, configuration or documentation change. Record what changed, what was actually verified, what remains open, and the package version when it changes. Preserve prior evidence in the phase reports and [experiment log](docs/experiment_log.md); do not turn planned features into completed claims.
 
@@ -80,3 +88,4 @@ The original Test 001 sorting response has **static evidence** for avoiding buil
 | 2026-11-08 | 0.2.1 | Put the version in the main chat header, enable automatic rerun on save and add a guarded restart script for stale/unavailable service | 42 tests passed after the launcher change; real database AppTest had zero exceptions and showed v0.2.1; live command line has `runOnSave=true` and port 8501 returned HTTP 200; see [experiment log](docs/experiment_log.md) |
 | 2026-11-08 | 0.3.0 | Session 02 provenance, static requirement checks, structured problem reports and analysis fixture | 51 tests passed; real database AppTest rendered 14 messages with zero exceptions; port 8501 health was HTTP 200; see [experiment log](docs/experiment_log.md) |
 | 2026-11-08 | 0.3.1 | Reproduced model failures, expanded dashboard checks and marked output-limit completions incomplete | 56 tests passed; fresh F: database AppTest zero exceptions; CLI and metadata 0.3.1; see [analysis](docs/MODEL_FAILURE_ROOT_CAUSE_ANALYSIS.md) |
+| 2026-11-08 | 0.3.2 | Added request-scoped CPU-only chat mode for optional 7B after reproducible Ollama CUDA HTTP 500; retained 1.5B GPU default | 7B CPU at context 4096 and 1.5B GPU completed; 58 tests, Ruff, AppTest and port health passed; see [incident log](docs/experiment_log.md#2026-11-08--ollama-http-500-recovery-v032) |

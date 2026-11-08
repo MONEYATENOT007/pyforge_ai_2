@@ -85,6 +85,14 @@ def main() -> None:
         model = st.selectbox("Installed model", models, disabled=not models)
         profile = st.selectbox("Role profile", list(PROFILES))
         context = st.select_slider("Context limit", options=[1024, 2048, 4096], value=4096)
+        gpu = _gpu()
+        cpu_default = model == "qwen2.5-coder:7b-instruct-q4_K_M" and any(
+            "RTX 2060" in line for line in gpu.get("gpus", [])
+        )
+        cpu_only = st.checkbox("CPU only (slower; avoids CUDA load failures)",
+                               value=cpu_default, key=f"cpu_only_{model}")
+        if cpu_only:
+            st.caption("CPU mode avoids this PC's 7B CUDA warmup failure; the first load can take over a minute.")
         st.caption("Roles change instructions, not model weights. One local model is active at a time.")
         loaded = _loaded_models()
         if loaded:
@@ -94,7 +102,6 @@ def main() -> None:
                 st.caption(f"Loaded: {item.get('name')} · Ollama reports {vram_text}")
         else:
             st.caption("No loaded model reported; a cold request may take longer")
-        gpu = _gpu()
         if gpu.get("status") == "ok":
             st.caption(f"GPU snapshot: {', '.join(gpu['gpus'])} (MiB total/free, then driver version)")
         st.caption("VRAM snapshots do not prove that every layer runs on GPU; inspect Ollama residency when measuring offload.")
@@ -182,7 +189,8 @@ def main() -> None:
         with st.chat_message("user"):
             st.markdown(prompt)
         with st.chat_message("assistant"):
-            client = OllamaClient(model, endpoint, timeout=180, context=context)
+            client = OllamaClient(model, endpoint, timeout=180, context=context,
+                                  num_gpu=0 if cpu_only else None)
             try:
                 def text_stream():
                     for chunk in stream_exchange(store, client, session_id, prompt, profile, context):
@@ -192,7 +200,7 @@ def main() -> None:
                     st.write_stream(text_stream())
                 st.rerun()
             except (ModelUnavailable, RuntimeError, OSError, ValueError) as exc:
-                st.error(f"Local response interrupted: {exc}. Any partial text is marked incomplete in chat history.")
+                st.error(f"Local response interrupted: {exc}. Any saved partial text is marked incomplete in chat history.")
     elif submitted:
         st.warning("Enter a message before sending")
 
