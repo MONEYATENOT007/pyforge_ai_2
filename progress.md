@@ -48,6 +48,12 @@ The original Test 001 sorting response has **static evidence** for avoiding buil
 - Verified the settings parse as JSON; applying the configured terminal environment in PowerShell resolved both `python` and `pip` to `F:\pyforge_ai_2\.venv\Scripts`. `python --version` reported 3.14.10; both `pip --version` and `python -m pip --version` reported pip 26.2.2 for Python 3.14. `git diff --check` passed.
 - Remaining: close existing VS Code terminals and open a new terminal to confirm the editor applies the settings. If VS Code has a previously selected interpreter, use **Python: Select Interpreter** to choose `.venv\Scripts\python.exe`. Live VS Code terminal behavior was not directly verified. Package version remains 0.2.1 because this is a workspace configuration fix.
 
+### Port 8501 schema-version recovery (2026-11-08)
+
+- The owner saw `Chat database version 4 is newer than this app supports` after the v0.3.0 update. Fresh source and the live database were both schema v4. The error was consistent with the running Streamlit process retaining an older imported storage module; its loaded module version was not directly inspected.
+- The guarded chat restart replaced only the verified PyForge process. Afterward, port 8501 health and root returned HTTP 200; AppTest against the live F: database rendered all 14 messages with zero exceptions and showed v0.3.0.
+- Future live SQLite schema migrations require one server restart. Routine source edits still use Streamlit's automatic rerun. Package version remains 0.3.0 because this was an operational recovery and documentation update.
+
 | Date | Version | Change | Verification |
 |---|---|---|---|
 | 2026-11-08 | 0.1.0 | Initial preflight, local model, benchmark and working chat slices; see phase reports | Earlier suite reached 33 tests; see [implementation ledger](PYFORGE_AI_CODEX_REVISED_MASTER_PLAN.MD) |
