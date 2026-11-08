@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyforge-ai"
+dynamic = ["version"]
+description = "Offline-first Python coding assistant prototype"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+ui = ["streamlit==1.67.0"]
+
+[project.scripts]
+pyforge = "pyforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pyforge*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "pyforge._version.VERSION"}
+
+[tool.setuptools.package-data]
+"pyforge.evaluation" = ["tasks.json"]

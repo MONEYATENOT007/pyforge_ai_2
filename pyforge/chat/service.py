@@ -1,0 +1,45 @@
+"""Persist a streamed exchange, including honest interrupted status."""
+
+import time
+
+from .profiles import build_chat_messages
+from .store import ChatStore
+from pyforge.models.client import ModelChunk
+
+
+def stream_exchange(store: ChatStore, client, session_id: int, prompt: str, profile: str, context: int = 4096):
+    history = store.messages(session_id)
+    messages = build_chat_messages(history, prompt, profile, max_chars=min(12000, context * 2))
+    store.add_message(session_id, "user", prompt)
+    run = {
+        "backend": "ollama" if client.__class__.__name__ == "OllamaClient" else "unknown",
+        "model_digest": "unknown",
+        "quantization": "unknown",
+        "context_tokens": context,
+        "temperature": 0 if client.__class__.__name__ == "OllamaClient" else "unknown",
+        "top_p": "unknown",
+        "seed": "unknown",
+        "system_prompt": messages[0]["content"],
+        "profile": profile,
+        "test_suite_version": "unknown",
+    }
+    pieces: list[str] = []
+    final: ModelChunk | None = None
+    started = time.perf_counter()
+    first_token_seconds: float | None = None
+    try:
+        for chunk in client.chat_stream(messages, context=context):
+            if chunk.text:
+                if first_token_seconds is None:
+                    first_token_seconds = time.perf_counter() - started
+                pieces.append(chunk.text)
+            if chunk.done:
+                final = chunk
+            yield chunk
+        if final is None:
+            raise RuntimeError("Model stream ended without completion")
+    except Exception:
+        if pieces:
+            store.add_message(session_id, "assistant", "".join(pieces), model=client.model, profile=profile, run=run, metrics={"status": "interrupted", "context": context, "time_to_first_token_seconds": first_token_seconds})
+        raise
+    store.add_message(session_id, "assistant", "".join(pieces) or "(empty response)", model=client.model, profile=profile, run=run, metrics={"status": "complete", "context": context, "time_to_first_token_seconds": first_token_seconds, "prompt_tokens": final.prompt_tokens, "output_tokens": final.output_tokens, "total_seconds": final.total_seconds, "load_seconds": final.load_seconds, "generation_seconds": final.generation_seconds})
