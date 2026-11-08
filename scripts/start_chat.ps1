@@ -11,4 +11,4 @@ if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "Python execut
 $env:PYTHONPATH = $projectRoot
 $env:PYFORGE_DATA_ROOT = Join-Path $projectRoot "local_runtime\data"
 $env:STREAMLIT_BROWSER_GATHER_USAGE_STATS = "false"
-& $python -m streamlit run $app --server.address 127.0.0.1 --server.port $Port --server.headless true --browser.gatherUsageStats false
+& $python -m streamlit run $app --server.address 127.0.0.1 --server.port $Port --server.headless true --server.runOnSave true --browser.gatherUsageStats false

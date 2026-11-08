@@ -34,7 +34,7 @@ def _metric_text(message: dict) -> str:
 def main() -> None:
     import streamlit as st
 
-    st.set_page_config(page_title="PyForge AI", page_icon="🐍", layout="wide")
+    st.set_page_config(page_title=f"PyForge AI v{__version__}", page_icon="🐍", layout="wide")
     store = ChatStore(_data_root() / "chat.sqlite3")
     sessions = store.list_sessions()
     if not sessions:
@@ -109,7 +109,8 @@ def main() -> None:
             st.caption("Preview and copy Markdown below. Redaction is pattern-based; review private content before sharing.")
             st.code(markdown, language="markdown")
 
-    st.title(selected_session["title"])
+    st.title(f"PyForge AI · v{__version__}")
+    st.subheader(selected_session["title"])
     st.caption("Local Ollama endpoint · our portable launcher disables cloud features · no automatic code execution or test claims")
     history = store.messages(session_id)
     previous_user = ""

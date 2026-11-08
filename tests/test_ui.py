@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from pyforge.chat.store import ChatStore
+from pyforge import __version__
 from pyforge.models.client import ModelChunk
 
 try:
@@ -23,6 +24,7 @@ class UiTests(unittest.TestCase):
             app = AppTest.from_file(str(APP)).run(timeout=20)
             self.assertEqual(len(app.exception), 0, [item.message for item in app.exception])
             self.assertIn("PyForge AI", [item.value for item in app.title])
+            self.assertIn(f"PyForge AI · v{__version__}", [item.value for item in app.title])
             self.assertTrue(any(item.label == "Installed model" for item in app.selectbox))
             self.assertTrue(any(item.label == "Redact potential secrets" and item.value for item in app.checkbox))
 

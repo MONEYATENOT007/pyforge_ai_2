@@ -1,7 +1,8 @@
 # PyForge AI progress
 
-**Local package version:** 0.2.0 (source: `pyforge/_version.py`)  
-**Last updated:** 2026-11-08  
+**Local package version:** 0.2.1 (source: `pyforge/_version.py`)
+
+**Last updated:** 2026-11-08
 **Status:** Working offline-first chat and analysis prototype. Isolated execution is not available.
 
 This is the current work ledger. Update it in the same change as any source, test, configuration or documentation change. Record what changed, what was actually verified, what remains open, and the package version when it changes. Preserve prior evidence in the phase reports and [experiment log](docs/experiment_log.md); do not turn planned features into completed claims.
@@ -42,3 +43,4 @@ The original Test 001 sorting response has **static evidence** for avoiding buil
 |---|---|---|---|
 | 2026-11-08 | 0.1.0 | Initial preflight, local model, benchmark and working chat slices; see phase reports | Earlier suite reached 33 tests; see [implementation ledger](PYFORGE_AI_CODEX_REVISED_MASTER_PLAN.MD) |
 | 2026-11-08 | 0.2.0 | First user test export, feedback and static evaluation work; centralized local version and progress tracking | 42 tests passed; installed metadata and CLI match 0.2.0; see [experiment log](docs/experiment_log.md) |
+| 2026-11-08 | 0.2.1 | Put the version in the main chat header, enable automatic rerun on save and add a guarded restart script for stale/unavailable service | 42 tests passed after the launcher change; real database AppTest had zero exceptions and showed v0.2.1; live command line has `runOnSave=true` and port 8501 returned HTTP 200; see [experiment log](docs/experiment_log.md) |
