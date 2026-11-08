@@ -18,7 +18,8 @@ def _cloud_tag(model: str) -> bool:
 
 
 class OllamaClient:
-    def __init__(self, model: str, url: str = "http://127.0.0.1:11434", timeout: float = 120, context: int = 4096) -> None:
+    def __init__(self, model: str, url: str = "http://127.0.0.1:11434", timeout: float = 120, context: int = 4096,
+                 max_output_tokens: int | None = None) -> None:
         parsed = urlsplit(url)
         if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or parsed.username or parsed.password or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
             raise ValueError("Ollama URL must be a loopback HTTP origin")
@@ -28,10 +29,13 @@ class OllamaClient:
             raise ValueError("Cloud model tags are disabled in PyForge")
         if timeout <= 0 or context <= 0:
             raise ValueError("timeout and context must be positive")
+        if max_output_tokens is not None and max_output_tokens <= 0:
+            raise ValueError("max_output_tokens must be positive")
         self.url = url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.context = context
+        self.max_output_tokens = max_output_tokens
         self._opener = build_opener(ProxyHandler({}))
 
     def list_models(self) -> list[str]:
@@ -84,7 +88,10 @@ class OllamaClient:
         size = self.context if context is None else context
         if size <= 0:
             raise ValueError("context must be positive")
-        body = json.dumps({"model": self.model, "messages": messages, "stream": True, "options": {"num_ctx": size, "temperature": 0}}).encode("utf-8")
+        options = {"num_ctx": size, "temperature": 0}
+        if self.max_output_tokens is not None:
+            options["num_predict"] = self.max_output_tokens
+        body = json.dumps({"model": self.model, "messages": messages, "stream": True, "options": options}).encode("utf-8")
         request = Request(self.url + "/api/chat", data=body, headers={"Content-Type": "application/json"}, method="POST")
         try:
             with self._opener.open(request, timeout=self.timeout) as response:
@@ -109,6 +116,7 @@ class OllamaClient:
                         total_seconds=item.get("total_duration", 0) / 1e9 if done else None,
                         load_seconds=item.get("load_duration", 0) / 1e9 if done else None,
                         generation_seconds=item.get("eval_duration", 0) / 1e9 if done else None,
+                        done_reason=item.get("done_reason") if done and isinstance(item.get("done_reason"), str) else None,
                     )
                     if done:
                         finished = True
@@ -126,7 +134,10 @@ class OllamaClient:
             raise ModelUnavailable("Local Ollama returned invalid stream JSON") from exc
 
     def generate(self, prompt: str) -> ModelReply:
-        body = json.dumps({"model": self.model, "prompt": prompt, "stream": False, "options": {"num_ctx": self.context, "temperature": 0}}).encode("utf-8")
+        options = {"num_ctx": self.context, "temperature": 0}
+        if self.max_output_tokens is not None:
+            options["num_predict"] = self.max_output_tokens
+        body = json.dumps({"model": self.model, "prompt": prompt, "stream": False, "options": options}).encode("utf-8")
         request = Request(self.url + "/api/generate", data=body, headers={"Content-Type": "application/json"}, method="POST")
         started = time.monotonic()
         try:

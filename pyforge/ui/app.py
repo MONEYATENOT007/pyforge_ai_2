@@ -21,6 +21,8 @@ def _metric_text(message: dict) -> str:
     metrics = message.get("metrics") or {}
     if metrics.get("status") == "interrupted":
         return "Interrupted response; content may be incomplete"
+    if metrics.get("status") == "output_limited":
+        return "Output token limit reached; response is incomplete and not automatically tested"
     if metrics.get("status") != "complete":
         return "Not automatically tested"
     tokens = metrics.get("output_tokens")

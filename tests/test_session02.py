@@ -58,6 +58,15 @@ class Session02Tests(unittest.TestCase):
         )
         self.assertEqual(result["requirements"], [])
 
+    def test_explicit_performance_dashboard_prompt_gets_compliance_checklist(self):
+        result = review_requirements(
+            "Build a Tkinter-only performance dashboard with CPU GPU RAM and historical graphs",
+            "import tkinter as tk\nroot = tk.Tk()",
+        )
+        ids = {item["id"] for item in result["requirements"]}
+        self.assertEqual(ids, {"tkinter_only", "cpu_metric", "ram_metric", "gpu_metric", "live_graphs",
+                               "nonblocking_updates", "unresolved_references", "invalid_literal_conversion"})
+
 
 if __name__ == "__main__":
     unittest.main()

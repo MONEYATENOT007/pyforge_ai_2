@@ -5,7 +5,7 @@ import re
 
 from .static_review import MAX_CODE_CHARS, extract_python_code
 
-CHECKER_VERSION = "session02-static-v1"
+CHECKER_VERSION = "session02-static-v2"
 
 
 def _effective_prompt(prompt: str, context: list[str] | None) -> str:
@@ -26,8 +26,9 @@ def _effective_prompt(prompt: str, context: list[str] | None) -> str:
 def extract_requirements(prompt: str, context: list[str] | None = None) -> list[dict]:
     """Small, explicit checklist for known prompt families, including correction turns."""
     text = _effective_prompt(prompt, context).lower()
-    if ("task manager" in text or "performance window" in text or
-            ("live graphs" in text and ("pyqt" in text or "gpu" in text))):
+    if ("task manager" in text or "performance window" in text or "performance dashboard" in text or
+            ("gpu" in text and "cpu" in text and "ram" in text and
+             ("graph" in text or "monitor" in text))):
         criteria = [
             ("tkinter_only", "Use Tkinter and exclude PyQt when requested", "explicit"),
             ("cpu_metric", "Show CPU utilization from a CPU source", "explicit"),

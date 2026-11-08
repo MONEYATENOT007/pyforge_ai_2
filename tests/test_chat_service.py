@@ -75,3 +75,18 @@ class ChatServiceTests(unittest.TestCase):
             self.assertEqual(saved["run"]["runtime_version"], "0.40.14")
             self.assertEqual(saved["run"]["system_prompt"], sent[0]["content"])
             self.assertTrue(saved["run"]["requirements_checklist"])
+
+    def test_output_limit_is_recorded_as_incomplete(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = ChatStore(Path(temp) / "chat.sqlite3")
+            session = store.create_session()
+            client = OllamaClient("local:model", max_output_tokens=768)
+            with patch.object(client, "model_metadata", return_value={}), patch.object(
+                client, "chat_stream", return_value=iter([ModelChunk(text="partial code"),
+                                                           ModelChunk(done=True, output_tokens=768, done_reason="length")])
+            ):
+                list(stream_exchange(store, client, session, "Make a GUI", "General"))
+            saved = store.messages(session)[1]
+            self.assertEqual(saved["metrics"]["status"], "output_limited")
+            self.assertEqual(saved["metrics"]["done_reason"], "length")
+            self.assertEqual(saved["run"]["max_output_tokens"], 768)

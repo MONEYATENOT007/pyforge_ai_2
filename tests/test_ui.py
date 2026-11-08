@@ -19,6 +19,20 @@ APP = Path(__file__).resolve().parent.parent / "pyforge/ui/app.py"
 
 @unittest.skipUnless(AppTest is not None, "Streamlit UI extra is not installed")
 class UiTests(unittest.TestCase):
+    def test_output_limited_response_is_visible_as_incomplete(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = ChatStore(Path(temp) / "chat.sqlite3")
+            session = store.create_session()
+            store.add_message(session, "user", "Write a function")
+            store.add_message(session, "assistant", "partial code", metrics={
+                "status": "output_limited", "done_reason": "length", "output_tokens": 128})
+            with patch.dict(os.environ, {"PYFORGE_DATA_ROOT": temp}), patch(
+                "pyforge.models.ollama_client.OllamaClient.list_models", return_value=["fake-local"]
+            ):
+                app = AppTest.from_file(str(APP)).run(timeout=20)
+            self.assertEqual(len(app.exception), 0)
+            self.assertTrue(any("Output token limit reached" in item.value for item in app.caption))
+
     def test_bad_gui_code_gets_visible_static_warning(self):
         with tempfile.TemporaryDirectory() as temp:
             store = ChatStore(Path(temp) / "chat.sqlite3")

@@ -109,6 +109,23 @@ class ModelTests(unittest.TestCase):
             self.assertEqual((chunks[-1].prompt_tokens, chunks[-1].output_tokens), (5, 2))
             self.assertEqual(json.loads(server.last_body)["messages"][0]["content"], "greet")
 
+    def test_stream_output_limit_is_sent_to_ollama_when_requested(self):
+        events = b'{"message":{"content":"done"},"done":true,"done_reason":"length","prompt_eval_count":3,"eval_count":1}\n'
+        with local_ollama_response(body=events) as server:
+            client = OllamaClient("a:1b", f"http://127.0.0.1:{server.server_port}", max_output_tokens=768)
+            last = list(client.chat_stream([{"role": "user", "content": "fix"}]))[-1]
+            self.assertTrue(last.done)
+            self.assertEqual(last.done_reason, "length")
+            self.assertEqual(json.loads(server.last_body)["options"]["num_predict"], 768)
+        with self.assertRaisesRegex(ValueError, "max_output_tokens"):
+            OllamaClient("a:1b", max_output_tokens=0)
+
+    def test_generate_output_limit_uses_same_ollama_option(self):
+        with local_ollama_response(body=b'{"response":"ready"}') as server:
+            client = OllamaClient("a:1b", f"http://127.0.0.1:{server.server_port}", max_output_tokens=128)
+            self.assertEqual(client.generate("say ready").text, "ready")
+            self.assertEqual(json.loads(server.last_body)["options"]["num_predict"], 128)
+
     def test_model_metadata_reads_server_fields_without_guessing_from_tag(self):
         client = OllamaClient("example:q4")
         responses = {

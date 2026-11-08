@@ -22,6 +22,7 @@ class ModelChunk:
     total_seconds: float | None = None
     load_seconds: float | None = None
     generation_seconds: float | None = None
+    done_reason: str | None = None
 
 
 class ModelClient(Protocol):

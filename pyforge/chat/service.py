@@ -30,6 +30,7 @@ def stream_exchange(store: ChatStore, client, session_id: int, prompt: str, prof
         "runtime_version": "unknown",
         "context_tokens": context,
         "temperature": 0 if is_ollama else "unknown",
+        "max_output_tokens": client.max_output_tokens if is_ollama and client.max_output_tokens is not None else "unknown",
         "top_p": "unknown",
         "seed": "unknown",
         "system_prompt": messages[0]["content"],
@@ -58,4 +59,4 @@ def stream_exchange(store: ChatStore, client, session_id: int, prompt: str, prof
         if pieces:
             store.add_message(session_id, "assistant", "".join(pieces), model=client.model, profile=profile, run=run, metrics={"status": "interrupted", "context": context, "time_to_first_token_seconds": first_token_seconds})
         raise
-    store.add_message(session_id, "assistant", "".join(pieces) or "(empty response)", model=client.model, profile=profile, run=run, metrics={"status": "complete", "context": context, "time_to_first_token_seconds": first_token_seconds, "prompt_tokens": final.prompt_tokens, "output_tokens": final.output_tokens, "total_seconds": final.total_seconds, "load_seconds": final.load_seconds, "generation_seconds": final.generation_seconds})
+    store.add_message(session_id, "assistant", "".join(pieces) or "(empty response)", model=client.model, profile=profile, run=run, metrics={"status": "output_limited" if final.done_reason == "length" else "complete", "done_reason": final.done_reason or "unknown", "context": context, "time_to_first_token_seconds": first_token_seconds, "prompt_tokens": final.prompt_tokens, "output_tokens": final.output_tokens, "total_seconds": final.total_seconds, "load_seconds": final.load_seconds, "generation_seconds": final.generation_seconds})

@@ -1,6 +1,6 @@
 # PyForge AI progress
 
-**Local package version:** 0.3.0 (source: `pyforge/_version.py`)
+**Local package version:** 0.3.1 (source: `pyforge/_version.py`)
 
 **Last updated:** 2026-11-08
 **Status:** Working offline-first chat and analysis prototype. Isolated execution is not available.
@@ -17,7 +17,8 @@ This is the current work ledger. Update it in the same change as any source, tes
 | [First user test report](FIRST_TEST_RUN_BY_USER.md), P0 | SQLite schema v3 with stable UUIDs and v1 migration; full selected-session JSON/Markdown export; default redaction and preview; JSON import; editable response-linked rating/comment/category | [First user test log](docs/experiment_log.md); export/import, migration, redaction and UI tests |
 | First user test report, partial P1 | Static requirement checklist for the two reported prompts, analysis-only response queue, disabled Run Tests control | Tests compare the supplied outputs; no generated code was executed |
 | [Session 02 analysis](PYFORGE_AI_SESSION_02_FAILURE_ANALYSIS.md), partial P0/P1 | Redacted five-response fixture; context-aware static GUI and dashboard checks; pre-generation checklist; Ollama digest/quantization/runtime capture; structured problem reports linked to exact responses; visible static warnings | Session 02 fixture tests, mock UI/service tests and two real 1.5B text-only probes; no generated app was executed |
-| Versioning foundation | One package version source, CLI `--version`, UI version display and this ledger | Source, CLI and installed metadata now report 0.3.0; full suite passed 51 tests; `pip check` was clean |
+| Versioning foundation | One package version source, CLI `--version`, UI version display and this ledger | At v0.3.0, source, CLI and installed metadata matched; 51 tests passed and `pip check` was clean. Current v0.3.1 checks are below. |
+| Model failure diagnostic, v0.3.1 | Original export located and matched to redacted fixture; four 1.5B reprobes plus structured prompts; Ruff F821 and syntax review; output-limit completion status; broader dashboard checklist recognition | [Root-cause analysis](docs/MODEL_FAILURE_ROOT_CAUSE_ANALYSIS.md); 56 repository tests passed; generated programs unexecuted |
 
 The original Test 001 sorting response has **static evidence** for avoiding built-in sort; sorting correctness is unknown until isolated tests run. Test 002's supplied Tkinter code has static evidence of folder selection and static failures for in-GUI preview, in-GUI filename entry and confirmation. These are not GUI runtime results.
 
@@ -27,7 +28,7 @@ The original Test 001 sorting response has **static evidence** for avoiding buil
 |---|---|---|
 | Revised Stage 1 | Owner browser walkthrough, explicit cancel control, offline-disconnected trial, UI polish and failure reporting | Open; Streamlit AppTest and HTTP health are not a browser walkthrough |
 | First user test P0/P1 | Browser verification of export downloads/copy, direct evaluation-lab import UI, broader human-reviewed checklists | Open; JSON import API and queue exist |
-| Session 02 P0/P1 | Isolated GUI and filesystem test harness, verified minimal repair attempts with history/rollback, direct lab case import, reliable model comparison against an installed 7B checkpoint | Open; the two new 1.5B probes still have static failures, Docker is unavailable, and no 7B run exists |
+| Session 02 P0/P1 | Isolated GUI and filesystem test harness, verified minimal repair attempts with history/rollback, direct lab case import, reliable model comparison against an installed 7B checkpoint | Open; new 1.5B probes still fail static checks, Docker is unavailable, and no 7B run exists. 7B download requires owner approval. |
 | Revised Stage 2 / first user test P1 | Hardened isolated runner with no internet, bounded time/memory and disposable synthetic files; sorting matrix and Tkinter GUI acceptance fixtures | Not implemented; Run Tests stays disabled |
 | Revised Stage 3 | Validated 120–200 task bank, held-out splits, reproducible manifests and genuine correctness grading; paired short/structured Test 002 model experiment | Prototype only; exact model/config for the user-supplied outputs is unknown |
 | Revised Stages 4–9 / initial Phases 2–6 | Repository intelligence, controlled debugger/repair, modular changes, then evidence-gated training/specialists and advanced UX/research | Not started; no fine-tuning authorized or performed |
@@ -54,9 +55,18 @@ The original Test 001 sorting response has **static evidence** for avoiding buil
 - The guarded chat restart replaced only the verified PyForge process. Afterward, port 8501 health and root returned HTTP 200; AppTest against the live F: database rendered all 14 messages with zero exceptions and showed v0.3.0.
 - Future live SQLite schema migrations require one server restart. Routine source edits still use Streamlit's automatic rerun. Package version remains 0.3.0 because this was an operational recovery and documentation update.
 
+### Model failure diagnosis and output-limit evidence (2026-11-08)
+
+- Inspected the original `pyforge-chat-20261108-e9a09316.md` export in the owner's Downloads folder, read only. Its five relevant response IDs, prompts and responses matched the redacted fixture. Fresh probes used the fixture and the installed 1.5B Q4_K_M model, saving full raw results only under ignored `results/` on F:.
+- Four representative model calls and structured variants reproduced PyQt after a Tkinter correction, unresolved names, fake GPU values, and a failed NameError repair. The largest fresh input was 1,374 tokens and the original export's largest recorded input was 1,903, both below 4,096. No generated code was run, so algorithm and GUI runtime correctness remain unknown. Ruff 0.17.4 was installed into the F: venv for diagnostic static F821 checks.
+- Version 0.3.1 adds optional diagnostic output-token bounding, persists Ollama completion reason and labels `done_reason=length` as incomplete in chat. It expands the dashboard checklist matcher and its test. A 128-token controlled probe confirmed an incomplete code block with `done_reason=length`; ordinary chat still has no explicit output cap.
+- Verification: `python -m unittest discover -s tests` passed **56 tests**; Ruff F821 on repository source/tests passed and `pip check` found no broken requirements. A fresh Streamlit AppTest using the current F: database rendered without exceptions and showed v0.3.1; port 8501 health returned HTTP 200. CLI, imported source and package metadata report 0.3.1 after the editable install and regeneration of an ignored stale root egg-info record. The diagnostic script refused to replace an existing result. The owner's browser session was not inspected. Static import-discovery checks found all top-level modules in the fresh generated code available in the F: venv; candidate imports were not executed. See [analysis and measurements](docs/MODEL_FAILURE_ROOT_CAUSE_ANALYSIS.md).
+- Remaining: Build an isolated runner and synthetic GUI/file acceptance tests; capture exact source and traceback for bounded minimal repairs; perform a paired 1.5B/7B Q4 comparison after owner approval for the 7B download. No default-model switch, model training or generated-code execution occurred.
+
 | Date | Version | Change | Verification |
 |---|---|---|---|
 | 2026-11-08 | 0.1.0 | Initial preflight, local model, benchmark and working chat slices; see phase reports | Earlier suite reached 33 tests; see [implementation ledger](PYFORGE_AI_CODEX_REVISED_MASTER_PLAN.MD) |
 | 2026-11-08 | 0.2.0 | First user test export, feedback and static evaluation work; centralized local version and progress tracking | 42 tests passed; installed metadata and CLI match 0.2.0; see [experiment log](docs/experiment_log.md) |
 | 2026-11-08 | 0.2.1 | Put the version in the main chat header, enable automatic rerun on save and add a guarded restart script for stale/unavailable service | 42 tests passed after the launcher change; real database AppTest had zero exceptions and showed v0.2.1; live command line has `runOnSave=true` and port 8501 returned HTTP 200; see [experiment log](docs/experiment_log.md) |
 | 2026-11-08 | 0.3.0 | Session 02 provenance, static requirement checks, structured problem reports and analysis fixture | 51 tests passed; real database AppTest rendered 14 messages with zero exceptions; port 8501 health was HTTP 200; see [experiment log](docs/experiment_log.md) |
+| 2026-11-08 | 0.3.1 | Reproduced model failures, expanded dashboard checks and marked output-limit completions incomplete | 56 tests passed; fresh F: database AppTest zero exceptions; CLI and metadata 0.3.1; see [analysis](docs/MODEL_FAILURE_ROOT_CAUSE_ANALYSIS.md) |
