@@ -113,18 +113,23 @@ def main() -> None:
     st.subheader(selected_session["title"])
     st.caption("Local Ollama endpoint · our portable launcher disables cloud features · no automatic code execution or test claims")
     history = store.messages(session_id)
-    previous_user = ""
+    user_prompts: list[str] = []
     for message in history:
         if message["role"] == "user":
-            previous_user = message["content"]
+            user_prompts.append(message["content"])
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if message["role"] == "assistant":
                 st.caption(_metric_text(message))
+                prompt_text = user_prompts[-1] if user_prompts else ""
+                static_review = review_requirements(prompt_text, message["content"], context=user_prompts[:-1])
+                failed_checks = [item["id"] for item in static_review["requirements"] if item["status"] == "failed"]
+                if failed_checks:
+                    st.warning(f"Static review flagged: {', '.join(failed_checks)}. Generated code was not run.")
                 with st.expander("Requirement review", expanded=False):
                     st.caption("Static inspection only. No generated code is run.")
                     if st.button("Review requirements", key=f"review_{message['id']}"):
-                        st.session_state[f"review_result_{message['id']}"] = review_requirements(previous_user, message["content"])
+                        st.session_state[f"review_result_{message['id']}"] = static_review
                     review = st.session_state.get(f"review_result_{message['id']}")
                     if review:
                         st.write(review)
@@ -153,6 +158,20 @@ def main() -> None:
                         else:
                             store.save_feedback(message["id"], 1 if rating == "👍" else -1, comment, candidate, category)
                             st.success("Saved locally")
+                with st.expander("Report a problem", expanded=False):
+                    st.caption("Linked to this exact response. Original code remains in the chat.")
+                    expected = st.text_area("Expected behavior", value=message.get("problem_expected") or "",
+                                            key=f"expected_{message['id']}")
+                    actual = st.text_area("Actual behavior", value=message.get("problem_actual") or "",
+                                          key=f"actual_{message['id']}")
+                    traceback = st.text_area("Traceback or error", value=message.get("problem_traceback") or "",
+                                             key=f"traceback_{message['id']}")
+                    if st.button("Save problem report", key=f"problem_{message['id']}"):
+                        try:
+                            store.save_problem_report(message["id"], expected, actual, traceback)
+                            st.success("Problem report saved locally")
+                        except ValueError as exc:
+                            st.error(str(exc))
 
     with st.form("compose", clear_on_submit=True):
         prompt = st.text_area("Message", placeholder="Ask about Python, paste code, or describe a traceback…", height=120)

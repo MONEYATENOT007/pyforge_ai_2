@@ -47,6 +47,37 @@ class OllamaClient:
             raise ModelUnavailable("Local Ollama returned an invalid model list")
         return sorted(item["name"] for item in data["models"] if isinstance(item, dict) and isinstance(item.get("name"), str) and not _cloud_tag(item["name"]))
 
+    def model_metadata(self) -> dict:
+        """Best-effort snapshot from this loopback server, never inferred from a tag."""
+        snapshot = {
+            "model_digest": "unknown",
+            "quantization": "unknown",
+            "runtime_version": "unknown",
+            "parameter_size": "unknown",
+            "model_size_bytes": "unknown",
+        }
+        try:
+            with self._opener.open(Request(self.url + "/api/tags", method="GET"), timeout=min(self.timeout, 10)) as response:
+                tags = json.load(response)
+            if isinstance(tags, dict) and isinstance(tags.get("models"), list):
+                selected = next((item for item in tags["models"] if isinstance(item, dict) and item.get("name") == self.model), None)
+                if selected:
+                    details = selected.get("details") if isinstance(selected.get("details"), dict) else {}
+                    snapshot["model_digest"] = selected.get("digest") or "unknown"
+                    snapshot["quantization"] = details.get("quantization_level") or "unknown"
+                    snapshot["parameter_size"] = details.get("parameter_size") or "unknown"
+                    snapshot["model_size_bytes"] = selected.get("size") if isinstance(selected.get("size"), int) else "unknown"
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError, TypeError):
+            pass
+        try:
+            with self._opener.open(Request(self.url + "/api/version", method="GET"), timeout=min(self.timeout, 10)) as response:
+                version = json.load(response)
+            if isinstance(version, dict) and isinstance(version.get("version"), str):
+                snapshot["runtime_version"] = version["version"]
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError, TypeError):
+            pass
+        return snapshot
+
     def chat_stream(self, messages: list[dict], *, context: int | None = None):
         if not messages or any(item.get("role") not in {"system", "user", "assistant"} or not isinstance(item.get("content"), str) for item in messages):
             raise ValueError("chat messages need valid roles and text content")

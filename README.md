@@ -32,6 +32,8 @@ The UI shows installed local models, six instruction profiles, a 1024–4096 tok
 
 Each assistant response has a static requirement review and an **Add to evaluation queue** action. The queue snapshots the preceding user prompt and exact response in SQLite without executing code. **Run Tests** is visible but disabled until an isolated runner is configured. The first user-observed examples are in [FIRST_TEST_RUN_BY_USER.md](FIRST_TEST_RUN_BY_USER.md); current implementation evidence is in [docs/experiment_log.md](docs/experiment_log.md).
 
+Session 02 adds a requirement checklist to recognized GUI requests before generation, then shows an evidence-labeled static warning when the returned code misses checkable requirements. The checker detects unused preview widgets, console input in GUI callbacks, PyQt imports after a Tkinter-only correction, CPU readings presented as GPU readings, and some definite name/literal errors. **Report a problem** saves expected behavior, actual behavior and traceback against the exact assistant response; JSON/Markdown exports retain that report. New Ollama turns record digest, quantization and runtime version from the local server when available. These checks do not establish that generated code runs correctly. See [Session 02 analysis](PYFORGE_AI_SESSION_02_FAILURE_ANALYSIS.md).
+
 For a fresh environment on an approved drive, create a virtual environment and install `.[ui]` using `requirements-ui.lock.txt` as constraints. On this PC, from the F: project root:
 
 ```powershell

@@ -94,6 +94,43 @@ class FirstUserRunTests(unittest.TestCase):
             self.assertEqual(case["review"]["syntax"], "static_evidence")
             self.assertEqual(len(store.evaluation_cases()), 1)
 
+    def test_problem_report_is_linked_editable_and_exported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = ChatStore(Path(temp) / "chat.sqlite3")
+            session = store.create_session()
+            user_id = store.add_message(session, "user", "Build a Tkinter app")
+            assistant_id = store.add_message(session, "assistant", "Original code")
+            with self.assertRaises(ValueError):
+                store.save_problem_report(user_id, actual="Wrong")
+            with self.assertRaises(ValueError):
+                store.save_problem_report(assistant_id)
+            store.save_problem_report(assistant_id, "GUI preview", "Console output", "NameError: missing")
+            created_at = store.messages(session)[1]["problem_created_at"]
+            store.save_problem_report(assistant_id, "GUI preview", "Still console output", "NameError: missing")
+            self.assertEqual(store.messages(session)[1]["problem_created_at"], created_at)
+            payload = json.loads(store.export_json(session, redact=False))
+            problem = payload["messages"][1]["problem_report"]
+            self.assertEqual(problem["message_id"], payload["messages"][1]["id"])
+            self.assertEqual(problem["actual"], "Still console output")
+            imported = ChatStore(Path(temp) / "import.sqlite3")
+            imported_session = imported.import_json(json.dumps(payload))
+            self.assertEqual(imported.messages(imported_session)[1]["problem_traceback"], "NameError: missing")
+            self.assertEqual(imported.messages(imported_session)[1]["content"], "Original code")
+
+    def test_queue_keeps_correction_context(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = ChatStore(Path(temp) / "chat.sqlite3")
+            session = store.create_session()
+            original = "Create a task manager showing CPU GPU RAM live usage, using Tkinter or PyQt"
+            store.add_message(session, "user", original)
+            store.add_message(session, "assistant", "First draft")
+            store.add_message(session, "user", "Do not use PyQt, just use Tkinter and live graphs")
+            response = store.add_message(session, "assistant", "from PyQt5.QtWidgets import QWidget")
+            store.queue_evaluation_case(response)
+            case = store.evaluation_cases()[0]
+            self.assertEqual(case["context"], [original])
+            self.assertEqual(case["review"]["requirements"][0]["status"], "failed")
+
     def test_legacy_database_migration_preserves_feedback(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "legacy.sqlite3"
@@ -155,6 +192,9 @@ tk.Button(root, command=choose)
             payload = json.loads(store.export_json(session))
             payload["messages"][0]["feedback"]["message_id"] = payload["session"]["id"]
             with self.assertRaisesRegex(ValueError, "mismatch"):
+                parse_export(json.dumps(payload))
+            payload["messages"][0]["feedback"] = "up"
+            with self.assertRaisesRegex(ValueError, "invalid feedback"):
                 parse_export(json.dumps(payload))
 
     def test_redaction_covers_quoted_credentials_bearer_and_spaced_paths(self):

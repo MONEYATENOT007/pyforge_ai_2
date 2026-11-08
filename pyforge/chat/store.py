@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 from uuid import uuid4
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _now() -> str:
@@ -70,6 +70,17 @@ class ChatStore:
                     created_at TEXT NOT NULL
                 )""")
                 db.execute("PRAGMA user_version = 3")
+            if version < 4:
+                db.execute("ALTER TABLE evaluation_cases ADD COLUMN context_json TEXT NOT NULL DEFAULT '[]'")
+                db.execute("""CREATE TABLE problem_reports (
+                    message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+                    expected TEXT NOT NULL DEFAULT '',
+                    actual TEXT NOT NULL DEFAULT '',
+                    traceback TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )""")
+                db.execute("PRAGMA user_version = 4")
 
     @contextmanager
     def _connect(self):
@@ -131,8 +142,12 @@ class ChatStore:
                 raise KeyError(session_id)
             rows = db.execute(
                 """SELECT m.*, f.rating, f.comment, f.candidate, f.failure_category,
-                          f.updated_at AS feedback_updated_at
+                          f.updated_at AS feedback_updated_at,
+                          p.expected AS problem_expected, p.actual AS problem_actual,
+                          p.traceback AS problem_traceback,
+                          p.created_at AS problem_created_at, p.updated_at AS problem_updated_at
                    FROM messages m LEFT JOIN feedback f ON f.message_id=m.id
+                   LEFT JOIN problem_reports p ON p.message_id=m.id
                    WHERE m.session_id=? ORDER BY m.id""", (session_id,)
             ).fetchall()
             return [{**dict(row),
@@ -154,6 +169,23 @@ class ChatStore:
                    comment=excluded.comment, candidate=excluded.candidate,
                    failure_category=excluded.failure_category, updated_at=excluded.updated_at""",
                 (message_id, rating, comment, int(candidate), failure_category.strip(), _now()),
+            )
+
+    def save_problem_report(self, message_id: int, expected: str = "",
+                            actual: str = "", traceback: str = "") -> None:
+        if not any(value.strip() for value in (expected, actual, traceback)):
+            raise ValueError("describe expected behavior, actual behavior, or a traceback")
+        with self._connect() as db:
+            row = db.execute("SELECT role FROM messages WHERE id=?", (message_id,)).fetchone()
+            if row is None or row["role"] != "assistant":
+                raise ValueError("problem report requires an assistant message")
+            now = _now()
+            db.execute(
+                """INSERT INTO problem_reports(message_id,expected,actual,traceback,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?)
+                   ON CONFLICT(message_id) DO UPDATE SET expected=excluded.expected,
+                   actual=excluded.actual, traceback=excluded.traceback, updated_at=excluded.updated_at""",
+                (message_id, expected, actual, traceback, now, now),
             )
 
     def export_json(self, session_id: int, *, redact: bool = True, include_details: bool = True) -> str:
@@ -201,6 +233,14 @@ class ChatStore:
                          feedback.get("comment", ""), int(feedback.get("candidate", False)),
                          feedback.get("failure_category", ""), feedback["timestamp"]),
                     )
+                problem = message.get("problem_report")
+                if problem:
+                    db.execute(
+                        """INSERT INTO problem_reports(message_id,expected,actual,traceback,created_at,updated_at)
+                           VALUES(?,?,?,?,?,?)""",
+                        (cursor.lastrowid, problem.get("expected", ""), problem.get("actual", ""),
+                         problem.get("traceback", ""), problem["created_at"], problem["updated_at"]),
+                    )
             return session_id
 
     def queue_evaluation_case(self, message_id: int) -> str:
@@ -212,12 +252,14 @@ class ChatStore:
             ).fetchone()
             if message is None or message["role"] != "assistant":
                 raise ValueError("evaluation case requires an assistant message")
-            prompt = db.execute(
+            prompts = db.execute(
                 """SELECT content FROM messages WHERE session_id=? AND id<? AND role='user'
-                   ORDER BY id DESC LIMIT 1""", (message["session_id"], message_id)
-            ).fetchone()
-            if prompt is None:
+                   ORDER BY id""", (message["session_id"], message_id)
+            ).fetchall()
+            if not prompts:
                 raise ValueError("assistant message has no preceding user prompt")
+            prompt = prompts[-1]["content"]
+            context = [row["content"] for row in prompts[:-1]]
             existing = db.execute(
                 "SELECT public_id FROM evaluation_cases WHERE message_id=?", (message_id,)
             ).fetchone()
@@ -226,10 +268,10 @@ class ChatStore:
             public_id = str(uuid4())
             db.execute(
                 """INSERT INTO evaluation_cases(public_id,message_id,prompt,response,review_json,
-                   suite_version,status,created_at) VALUES(?,?,?,?,?,?,?,?)""",
-                (public_id, message_id, prompt["content"], message["content"],
-                 json.dumps(review_requirements(prompt["content"], message["content"])),
-                 "first-user-run-v1", "static_reviewed", _now()),
+                   suite_version,status,created_at,context_json) VALUES(?,?,?,?,?,?,?,?,?)""",
+                (public_id, message_id, prompt, message["content"],
+                 json.dumps(review_requirements(prompt, message["content"], context=context)),
+                 "session02-static-v1", "static_reviewed", _now(), json.dumps(context)),
             )
             return public_id
 
@@ -238,4 +280,5 @@ class ChatStore:
             rows = db.execute(
                 "SELECT * FROM evaluation_cases ORDER BY id DESC"
             ).fetchall()
-            return [{**dict(row), "review": json.loads(row["review_json"])} for row in rows]
+            return [{**dict(row), "review": json.loads(row["review_json"]),
+                     "context": json.loads(row["context_json"])} for row in rows]

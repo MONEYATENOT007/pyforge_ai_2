@@ -2,6 +2,7 @@
 
 import ctypes
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 
 from pyforge.models.client import ModelClient
+from pyforge.models.ollama_client import OllamaClient
 
 
 def load_tasks(path: Path) -> list[dict]:
@@ -50,17 +52,33 @@ def run_benchmark(client: ModelClient, tasks: list[dict], output: Path) -> tuple
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite existing benchmark: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
+    task_set_hash = hashlib.sha256(json.dumps(tasks, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
     failures = 0
     with output.open("x", encoding="utf-8") as stream:
         for task in tasks:
+            is_ollama = isinstance(client, OllamaClient)
+            run = {
+                "backend": "ollama" if is_ollama else "unknown",
+                "model_name": getattr(client, "model", "unknown"),
+                "model_digest": "unknown",
+                "quantization": "unknown",
+                "runtime_version": "unknown",
+                "context_tokens": client.context if is_ollama else "unknown",
+                "temperature": 0 if is_ollama else "unknown",
+                "top_p": "unknown",
+                "seed": "unknown",
+                "task_set_sha256": task_set_hash,
+            }
+            if is_ollama:
+                run.update(client.model_metadata())
             before = sample_resources()
             timestamp = datetime.now(timezone.utc).isoformat()
             try:
                 reply = client.generate(task["prompt"])
-                record = {"task_id": task["id"], "domain": task["domain"], "prompt": task["prompt"], "review_focus": task["review_focus"], "timestamp": timestamp, "model": reply.model, "raw_output": reply.text, "prompt_tokens": reply.prompt_tokens, "output_tokens": reply.output_tokens, "latency_seconds": reply.latency_seconds, "resources_before": before, "resources_after": sample_resources(), "test_result": "not_run_no_isolated_executor", "status": "generated"}
+                record = {"task_id": task["id"], "domain": task["domain"], "prompt": task["prompt"], "review_focus": task["review_focus"], "timestamp": timestamp, "model": reply.model, "run": run, "raw_output": reply.text, "prompt_tokens": reply.prompt_tokens, "output_tokens": reply.output_tokens, "latency_seconds": reply.latency_seconds, "resources_before": before, "resources_after": sample_resources(), "test_result": "not_run_no_isolated_executor", "status": "generated"}
             except Exception as exc:
                 failures += 1
-                record = {"task_id": task["id"], "domain": task["domain"], "timestamp": timestamp, "status": "failed", "error_type": type(exc).__name__, "error": str(exc), "resources_before": before, "resources_after": sample_resources(), "test_result": "not_run_no_isolated_executor"}
+                record = {"task_id": task["id"], "domain": task["domain"], "timestamp": timestamp, "status": "failed", "run": run, "error_type": type(exc).__name__, "error": str(exc), "resources_before": before, "resources_after": sample_resources(), "test_result": "not_run_no_isolated_executor"}
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
             stream.flush()
     return len(tasks), failures

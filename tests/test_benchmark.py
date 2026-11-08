@@ -25,6 +25,8 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual((count, failures), (20, 0))
             self.assertEqual(len(rows), 20)
             self.assertTrue(all(row["raw_output"] == "pass" and row["test_result"] == "not_run_no_isolated_executor" for row in rows))
+            self.assertTrue(all(row["run"]["model_digest"] == "unknown" for row in rows))
+            self.assertEqual(len({row["run"]["task_set_sha256"] for row in rows}), 1)
             with self.assertRaises(FileExistsError):
                 run_benchmark(FakeClient(), load_tasks(TASKS), output)
 

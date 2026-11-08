@@ -30,11 +30,33 @@ CODE_FENCE = re.compile(r"```(?:python|py)?[ \t]*\r?\n(.*?)```", re.IGNORECASE |
 MAX_CODE_CHARS = 100_000
 
 
+def extract_python_code(output: str) -> str:
+    """Choose a Python fence over shell/other fences without treating a closing fence as code."""
+    blocks: list[tuple[str, str]] = []
+    open_language: str | None = None
+    body: list[str] = []
+    for line in output.splitlines(keepends=True):
+        marker = line.strip()
+        if marker.startswith("```"):
+            if open_language is None:
+                open_language = marker[3:].strip().lower()
+                body = []
+            else:
+                if open_language in {"python", "py", ""}:
+                    blocks.append((open_language, "".join(body)))
+                open_language = None
+                body = []
+        elif open_language is not None:
+            body.append(line)
+    if blocks:
+        return next((code for language, code in blocks if language in {"python", "py"}), blocks[0][1])
+    return output
+
+
 def review_output(task_id: str, output: str) -> dict:
     if not isinstance(output, str):
         return {"task_id": task_id, "code_found": False, "ast_parse_ok": False, "reason": "missing text"}
-    match = CODE_FENCE.search(output)
-    code = match.group(1) if match else output
+    code = extract_python_code(output)
     code = code.strip()
     if not code:
         return {"task_id": task_id, "code_found": False, "ast_parse_ok": False, "reason": "empty code"}

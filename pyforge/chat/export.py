@@ -40,6 +40,7 @@ def build_export(session: dict, messages: list[dict], *, redact: bool = True,
         "top_p": last_run.get("top_p", "unknown"),
         "seed": last_run.get("seed", "unknown"),
         "backend": last_run.get("backend") or "unknown",
+        "runtime_version": last_run.get("runtime_version") or "unknown",
     }
     result = {
         "schema_version": EXPORT_SCHEMA,
@@ -81,6 +82,15 @@ def build_export(session: dict, messages: list[dict], *, redact: bool = True,
                     "timestamp": m["feedback_updated_at"],
                     "message_id": m["public_id"],
                 }
+            if m["role"] == "assistant" and m.get("problem_updated_at"):
+                item["problem_report"] = {
+                    "message_id": m["public_id"],
+                    "expected": _safe(m.get("problem_expected") or "", redact),
+                    "actual": _safe(m.get("problem_actual") or "", redact),
+                    "traceback": _safe(m.get("problem_traceback") or "", redact),
+                    "created_at": m["problem_created_at"],
+                    "updated_at": m["problem_updated_at"],
+                }
         result["messages"].append(item)
     return result
 
@@ -110,6 +120,13 @@ def to_markdown(payload: dict) -> str:
             lines += ["", f"Feedback: {feedback['rating']} at {feedback['timestamp']}",
                       f"Category: {feedback['failure_category'] or 'none'}",
                       f"Comment: {feedback['comment']}"]
+        if message.get("problem_report"):
+            problem = message["problem_report"]
+            lines += ["", "### Reported problem", "",
+                      f"Expected: {problem['expected']}",
+                      f"Actual: {problem['actual']}",
+                      f"Traceback: {problem['traceback']}",
+                      f"Updated at: {problem['updated_at']}"]
     return "\n".join(lines) + "\n"
 
 
@@ -153,11 +170,29 @@ def parse_export(source: str) -> dict:
         if m.get("role") not in {"user", "assistant"} or not isinstance(m.get("content"), str):
             raise ValueError("invalid message role or content")
         check_time(m.get("timestamp"))
+        details = m.get("metadata")
+        if details is not None and (
+            not isinstance(details, dict) or
+            (details.get("metrics") is not None and not isinstance(details["metrics"], dict)) or
+            (details.get("run") is not None and not isinstance(details["run"], dict))
+        ):
+            raise ValueError("invalid message metadata")
         feedback = m.get("feedback")
-        if feedback:
+        if feedback is not None:
+            if not isinstance(feedback, dict):
+                raise ValueError("invalid feedback")
             if m["role"] != "assistant" or feedback.get("rating") not in {"up", "down"}:
                 raise ValueError("invalid feedback")
             if feedback.get("message_id") != m["id"]:
                 raise ValueError("feedback message ID mismatch")
             check_time(feedback.get("timestamp"))
+        problem = m.get("problem_report")
+        if problem is not None:
+            if not isinstance(problem, dict) or m["role"] != "assistant" or problem.get("message_id") != m["id"]:
+                raise ValueError("problem report message ID mismatch")
+            for key in ("expected", "actual", "traceback"):
+                if not isinstance(problem.get(key), str):
+                    raise ValueError("invalid problem report")
+            check_time(problem.get("created_at"))
+            check_time(problem.get("updated_at"))
     return payload

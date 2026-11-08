@@ -19,6 +19,29 @@ APP = Path(__file__).resolve().parent.parent / "pyforge/ui/app.py"
 
 @unittest.skipUnless(AppTest is not None, "Streamlit UI extra is not installed")
 class UiTests(unittest.TestCase):
+    def test_bad_gui_code_gets_visible_static_warning(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = ChatStore(Path(temp) / "chat.sqlite3")
+            session = store.create_session()
+            store.add_message(session, "user", "Make me an app using tkinter only which renames files in a folder with preview")
+            store.add_message(session, "assistant", """import tkinter as tk
+from tkinter import filedialog
+import os
+def choose():
+    folder = filedialog.askdirectory()
+    print(os.listdir(folder))
+    new_name = input("New name: ")
+    os.rename(folder, new_name)
+root = tk.Tk()
+tk.Button(root, command=choose)
+""")
+            with patch.dict(os.environ, {"PYFORGE_DATA_ROOT": temp}), patch(
+                "pyforge.models.ollama_client.OllamaClient.list_models", return_value=["fake-local"]
+            ):
+                app = AppTest.from_file(str(APP)).run(timeout=20)
+            self.assertEqual(len(app.exception), 0)
+            self.assertTrue(any("Static review flagged" in item.value for item in app.warning))
+
     def test_chat_playground_renders_with_local_model_list(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"PYFORGE_DATA_ROOT": temp}), patch("pyforge.models.ollama_client.OllamaClient.list_models", return_value=["fake-local"]):
             app = AppTest.from_file(str(APP)).run(timeout=20)
@@ -59,5 +82,11 @@ class UiTests(unittest.TestCase):
             self.assertEqual(len(app.exception), 0, [item.message for item in app.exception])
             saved = store.messages(session)[1]
             self.assertEqual((saved["rating"], saved["comment"], saved["candidate"]), (-1, "Needs an example", 1))
+            next(item for item in app.text_area if item.label == "Expected behavior").set_value("Show a GUI preview")
+            next(item for item in app.text_area if item.label == "Actual behavior").set_value("Printed to console")
+            app.button(key=f"problem_{assistant_id}").click()
+            app.run(timeout=20)
+            self.assertEqual(store.messages(session)[1]["problem_expected"], "Show a GUI preview")
+            self.assertEqual(store.messages(session)[1]["problem_actual"], "Printed to console")
             app = AppTest.from_file(str(APP)).run(timeout=20)
             self.assertTrue(any("A list stores values." in item.value for item in app.markdown))

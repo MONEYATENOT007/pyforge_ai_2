@@ -399,3 +399,7 @@ The full test suite reached 41 passing tests during this update; see `docs/exper
 ## 14. Local version and progress ledger — 2026-11-08
 
 PyForge package version 0.2.0 is now sourced from `pyforge/_version.py` and shown by the CLI and chat UI. The root `progress.md` is the current implementation ledger across this revised plan, the original build brief and the first user test report. The versioning change passed 42 tests, and local installed metadata matched 0.2.0. See `docs/experiment_log.md` for the command evidence.
+
+## 15. Session 02 analysis update — 2026-11-08
+
+Version 0.3.0 adds a redacted five-response static fixture from the user's actual session, context-aware requirement checks, pre-generation GUI checklists, visible static warnings, response-linked problem reports and best-effort model provenance from Ollama's local tags/version endpoints. A two-case 1.5B prompt probe still failed static renamer and dashboard criteria. Generated code was not executed; Stage 2 isolation, verified repair and a fair 7B comparison remain open. See `progress.md` and `docs/experiment_log.md` for precise evidence and limits.

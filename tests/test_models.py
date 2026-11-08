@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 import json
 import threading
 import unittest
@@ -107,6 +108,28 @@ class ModelTests(unittest.TestCase):
             self.assertTrue(chunks[-1].done)
             self.assertEqual((chunks[-1].prompt_tokens, chunks[-1].output_tokens), (5, 2))
             self.assertEqual(json.loads(server.last_body)["messages"][0]["content"], "greet")
+
+    def test_model_metadata_reads_server_fields_without_guessing_from_tag(self):
+        client = OllamaClient("example:q4")
+        responses = {
+            "/api/tags": {"models": [{"name": "example:q4", "digest": "abc123",
+                                      "size": 100, "details": {"quantization_level": "Q5_K_M",
+                                                                 "parameter_size": "1.5B"}}]},
+            "/api/version": {"version": "0.40.14"},
+        }
+        def fake_open(request, timeout):
+            path = request.full_url.rsplit("/", 1)[-1]
+            return BytesIO(json.dumps(responses["/api/" + path]).encode())
+        with patch.object(client._opener, "open", side_effect=fake_open):
+            metadata = client.model_metadata()
+        self.assertEqual(metadata["model_digest"], "abc123")
+        self.assertEqual(metadata["quantization"], "Q5_K_M")
+        self.assertEqual(metadata["runtime_version"], "0.40.14")
+        self.assertEqual(metadata["model_size_bytes"], 100)
+        with patch.object(client._opener, "open", side_effect=URLError("offline")):
+            missing = client.model_metadata()
+        self.assertEqual(missing["model_digest"], "unknown")
+        self.assertEqual(missing["runtime_version"], "unknown")
 
     def test_interrupted_stream_is_not_reported_as_complete(self):
         with local_ollama_response(body=b'{"message":{"content":"partial"},"done":false}\n') as server:
