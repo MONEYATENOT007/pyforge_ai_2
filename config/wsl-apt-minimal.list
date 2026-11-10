@@ -1,0 +1,2 @@
+# Bootstrap packages for the dedicated PyForge WSL sandbox.
+deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://archive.ubuntu.com/ubuntu noble main universe

@@ -8,13 +8,20 @@ from pyforge.chat.profiles import PROFILES
 from pyforge.chat.service import stream_exchange
 from pyforge.chat.store import ChatStore
 from pyforge.doctor import _gpu, _loaded_models
+from pyforge.evaluation.executable_cases import prepare_sort_case
 from pyforge.evaluation.requirements import review_requirements
 from pyforge.models.ollama_client import ModelUnavailable, OllamaClient
+from pyforge.sandbox import run_python_case
 
 
 def _data_root() -> Path:
     configured = os.environ.get("PYFORGE_DATA_ROOT")
     return Path(configured).expanduser().absolute() if configured else Path(__file__).resolve().parents[2] / "local_runtime" / "data"
+
+
+def _sandbox_configured() -> bool:
+    root = Path(__file__).resolve().parents[2]
+    return os.name == "nt" and (root / "local_runtime/wsl/PyForgeSandbox/ext4.vhdx").is_file()
 
 
 def _metric_text(message: dict) -> str:
@@ -49,7 +56,7 @@ def main() -> None:
     with st.sidebar:
         st.title("PyForge AI")
         st.caption(f"Version {__version__}")
-        st.caption("Local chat playground · generated code is not executed")
+        st.caption("Local chat playground · code runs only after you click Run Tests")
         if st.button("＋ New chat", use_container_width=True):
             st.session_state.active_session = store.create_session()
             st.rerun()
@@ -120,7 +127,7 @@ def main() -> None:
 
     st.title(f"PyForge AI · v{__version__}")
     st.subheader(selected_session["title"])
-    st.caption("Local Ollama endpoint · our portable launcher disables cloud features · no automatic code execution or test claims")
+    st.caption("Local Ollama endpoint · our portable launcher disables cloud features · no automatic code execution")
     history = store.messages(session_id)
     user_prompts: list[str] = []
     for message in history:
@@ -134,9 +141,9 @@ def main() -> None:
                 static_review = review_requirements(prompt_text, message["content"], context=user_prompts[:-1])
                 failed_checks = [item["id"] for item in static_review["requirements"] if item["status"] == "failed"]
                 if failed_checks:
-                    st.warning(f"Static review flagged: {', '.join(failed_checks)}. Generated code was not run.")
+                    st.warning(f"Static review flagged: {', '.join(failed_checks)}. Inspect any isolated test result separately.")
                 with st.expander("Requirement review", expanded=False):
-                    st.caption("Static inspection only. No generated code is run.")
+                    st.caption("Static inspection here; isolated tests run only when you click Run Tests.")
                     if st.button("Review requirements", key=f"review_{message['id']}"):
                         st.session_state[f"review_result_{message['id']}"] = static_review
                     review = st.session_state.get(f"review_result_{message['id']}")
@@ -148,8 +155,32 @@ def main() -> None:
                             st.success(f"Saved analysis-only case {case_id[:8]}")
                         except ValueError as exc:
                             st.error(str(exc))
-                    st.button("Run Tests", disabled=True, key=f"run_tests_{message['id']}")
-                    st.caption("Isolated execution backend is not configured.")
+                    metrics = message.get("metrics") or {}
+                    case = prepare_sort_case(message["content"]) if metrics.get("status") == "complete" else None
+                    ready = _sandbox_configured()
+                    if case:
+                        st.caption(f"Available reviewed fixture: {case.label}. {case.contract}")
+                        st.code(case.code, language="python")
+                    if st.button("Run Tests", disabled=not (case and ready), key=f"run_tests_{message['id']}"):
+                        with st.spinner("Running reviewed tests in the local container…"):
+                            st.session_state[f"test_result_{message['id']}"] = run_python_case(
+                                case.code, case.tests, enabled=True
+                            )
+                    result = st.session_state.get(f"test_result_{message['id']}")
+                    if result:
+                        summary = f"{result.status.replace('_', ' ')} · {result.elapsed_seconds:.2f}s · {case.label}"
+                        if result.status == "passed":
+                            st.success(summary + " (five cases only; other requirements need review)")
+                        else:
+                            st.warning(summary)
+                        if result.detail:
+                            st.code(result.detail, language="text")
+                        if result.stdout:
+                            st.code(result.stdout, language="text")
+                    elif not ready:
+                        st.caption("Isolated execution backend is not configured on this machine.")
+                    elif not case:
+                        st.caption("Not automatically testable: a complete single-block sorting function is required.")
                 with st.expander("Feedback", expanded=False):
                     rating_options = ["Unrated", "👍", "👎"]
                     current = 1 if message["rating"] == 1 else 2 if message["rating"] == -1 else 0

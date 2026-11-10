@@ -7,6 +7,7 @@ from unittest.mock import patch
 from pyforge.chat.store import ChatStore
 from pyforge import __version__
 from pyforge.models.client import ModelChunk
+from pyforge.sandbox import SandboxResult
 
 try:
     from streamlit.testing.v1 import AppTest
@@ -19,6 +20,28 @@ APP = Path(__file__).resolve().parent.parent / "pyforge/ui/app.py"
 
 @unittest.skipUnless(AppTest is not None, "Streamlit UI extra is not installed")
 class UiTests(unittest.TestCase):
+    def test_sorting_tests_require_user_click_and_show_real_result(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = ChatStore(Path(temp) / "chat.sqlite3")
+            session = store.create_session()
+            store.add_message(session, "user", "Return a sorted list")
+            assistant_id = store.add_message(session, "assistant", "```python\ndef sort_numbers(values):\n    return sorted(values)\n```",
+                                             metrics={"status": "complete"})
+            with patch.dict(os.environ, {"PYFORGE_DATA_ROOT": temp}), patch(
+                "pyforge.models.ollama_client.OllamaClient.list_models", return_value=["fake-local"]
+            ), patch(
+                "pyforge.sandbox.run_python_case", return_value=SandboxResult("passed", "", elapsed_seconds=0.3)
+            ) as run_case:
+                app = AppTest.from_file(str(APP)).run(timeout=20)
+                self.assertEqual(len(app.exception), 0)
+                run_case.assert_not_called()
+                self.assertFalse(app.button(key=f"run_tests_{assistant_id}").disabled,
+                                 [item.value for item in app.caption])
+                app.button(key=f"run_tests_{assistant_id}").click()
+                app.run(timeout=20)
+                run_case.assert_called_once()
+                self.assertTrue(any("five cases only" in item.value for item in app.success))
+
     def test_output_limited_response_is_visible_as_incomplete(self):
         with tempfile.TemporaryDirectory() as temp:
             store = ChatStore(Path(temp) / "chat.sqlite3")
