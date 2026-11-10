@@ -1,9 +1,16 @@
 # PyForge AI progress
 
-**Local package version:** 0.3.2 (source: `pyforge/_version.py`)
+**Local package version:** 0.3.3 (source: `pyforge/_version.py`)
 
-**Last updated:** 2026-11-08
+**Last updated:** 2026-11-10
 **Status:** Working offline-first chat and analysis prototype. Isolated execution is not available.
+
+### Training readiness work (2026-11-10)
+
+- The owner reports a significant improvement with 7B. This is valuable user feedback, but it is not yet an objective held-out score. The seven-case static comparison remains the only matched local sample; no default-model or training-success claim follows from this report alone.
+- Preflight: Docker is absent, WSL2 has no installed distribution, and the F: venv has no PyTorch, Transformers, PEFT, datasets, bitsandbytes or Accelerate. The live chat DB has zero marked training candidates and zero queued evaluation cases. C: had 82.6 GiB free, F: 208.8 GiB, G: 214.0 GiB; RAM available was 3.7 GiB and GPU free 5,129 MiB at the snapshot. No training job or generated-code execution was started.
+- Added v0.3.3 reviewed-data preparation and `curate-data` CLI command. It rejects unapproved, unlicensed, duplicate, evaluation-overlapping and cross-split examples; code examples require an isolated passing test reference. It emits train/validation JSONL and held-out prompt hashes, and requires all three splits. Review timestamps require a timezone. Five synthetic-fixture tests passed, including CLI success/failure; the full repository suite passed 63 tests. Ruff F821, Python compilation, scoped `git diff --check`, `pip check`, source/CLI/installed metadata alignment at 0.3.3, Streamlit AppTest render, and port 8501 health passed. No real code verification or model training occurred. See [data guide](docs/TRAINING_DATA_PREPARATION.md).
+- Remaining in revised plan order: an isolated execution backend and disposable GUI/file fixtures (Stage 2), a reviewed held-out task bank with genuine correctness grading (Stage 3), and then a hardware-verified small-model adapter experiment (Stage 5). Installing a WSL distro or Docker on F: needs the owner's explicit system-change approval under revised plan Section 0; no installation was attempted.
 
 ### Ollama HTTP 500 recovery (2026-11-08)
 
@@ -89,3 +96,4 @@ The original Test 001 sorting response has **static evidence** for avoiding buil
 | 2026-11-08 | 0.3.0 | Session 02 provenance, static requirement checks, structured problem reports and analysis fixture | 51 tests passed; real database AppTest rendered 14 messages with zero exceptions; port 8501 health was HTTP 200; see [experiment log](docs/experiment_log.md) |
 | 2026-11-08 | 0.3.1 | Reproduced model failures, expanded dashboard checks and marked output-limit completions incomplete | 56 tests passed; fresh F: database AppTest zero exceptions; CLI and metadata 0.3.1; see [analysis](docs/MODEL_FAILURE_ROOT_CAUSE_ANALYSIS.md) |
 | 2026-11-08 | 0.3.2 | Added request-scoped CPU-only chat mode for optional 7B after reproducible Ollama CUDA HTTP 500; retained 1.5B GPU default | 7B CPU at context 4096 and 1.5B GPU completed; 58 tests, Ruff, AppTest and port health passed; see [incident log](docs/experiment_log.md#2026-11-08--ollama-http-500-recovery-v032) |
+| 2026-11-10 | 0.3.3 | Added explicit reviewed-data curation, split/leakage checks and a training-readiness guide | 63 repository tests, Ruff, compile, AppTest, port health, pip check, and version metadata passed; no training run |

@@ -15,6 +15,7 @@ from .evaluation.runner import load_tasks, run_benchmark
 from .evaluation.static_review import review_file
 from .models.fake_client import FakeClient
 from .models.ollama_client import ModelUnavailable, OllamaClient
+from .training.curation import prepare_dataset
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -41,6 +42,10 @@ def main(argv: list[str] | None = None) -> int:
     review.add_argument("--results", type=Path, required=True, help="benchmark JSONL to review")
     review.add_argument("--output", type=Path, required=True, help="new review JSONL file")
     review.add_argument("--tasks", type=Path, default=Path(__file__).resolve().parent / "evaluation/tasks.json")
+    curate = sub.add_parser("curate-data", help="validate explicitly reviewed examples for future training; never trains a model")
+    curate.add_argument("--input", type=Path, required=True, help="reviewed JSON candidate file")
+    curate.add_argument("--output", type=Path, required=True, help="new output directory on F: or G:")
+    curate.add_argument("--evaluation-tasks", type=Path, default=Path(__file__).resolve().parent / "evaluation/tasks.json")
     args = parser.parse_args(argv)
     if args.command == "doctor":
         try:
@@ -78,6 +83,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Review error: {exc}", file=sys.stderr)
             return 2
         print(f"Reviewed {count} outputs: {parsed} parsed as Python; {missing} lack requested top-level names. No code was executed.")
+        return 0
+    if args.command == "curate-data":
+        try:
+            manifest = prepare_dataset(args.input, args.evaluation_tasks, args.output)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"Curation error: {exc}", file=sys.stderr)
+            return 2
+        print(f"Prepared reviewed data at {args.output}: {manifest['counts']}. No model was trained or generated code executed.")
         return 0
     prompt = args.prompt if args.prompt is not None else sys.stdin.read()
     if not prompt.strip():

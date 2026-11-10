@@ -1,3 +1,3 @@
 """Single source of truth for the local PyForge package version."""
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
